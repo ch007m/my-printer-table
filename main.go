@@ -12,13 +12,23 @@ import (
 	"strings"
 )
 
-func main() {
+type Config struct {
+	FilePath       string
+	PrinterOptions printers.PrintOptions
+	Succeeded      bool
+}
 
-	// Path to the Kubernetes Services JSON file
-	filePath := "services.json"
+func main() {
+	c := &Config{
+		FilePath: "services.json",
+		PrinterOptions: printers.PrintOptions{
+			Wide:      true,
+			NoHeaders: false,
+		},
+	}
 
 	// Read JSON file
-	fileData, err := os.ReadFile(filePath)
+	fileData, err := os.ReadFile(c.FilePath)
 	if err != nil {
 		log.Fatalf("Failed to read file: %v", err)
 	}
@@ -29,24 +39,29 @@ func main() {
 		log.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
 
-	// Set print options
-	opts := printers.PrintOptions{
-		Wide:      true,
-		NoHeaders: false,
-	}
-	printTable(opts, populateKubeServiceTable(*serviceList))
-}
-
-func printTable(opts printers.PrintOptions, table metav1.Table) {
-	// Print the table
-	out := bytes.NewBuffer([]byte{})
-	printer := printers.NewTablePrinter(opts)
-	err := printer.PrintObj(&table, out)
+	err = c.PrintTable(populateKubeServiceTable(*serviceList))
 	if err != nil {
 		fmt.Println("Error:", err)
-		return
 	}
+
+	if c.Succeeded {
+		fmt.Println("Table printed successfully !")
+	}
+
+}
+
+func (c *Config) PrintTable(table metav1.Table) error {
+	out := bytes.NewBuffer([]byte{})
+
+	printer := printers.NewTablePrinter(c.PrinterOptions)
+	err := printer.PrintObj(&table, out)
+	if err != nil {
+		return err
+	}
+
 	fmt.Println(out.String())
+	c.Succeeded = true
+	return nil
 }
 
 func populateKubeServiceTable(serviceList corev1.ServiceList) metav1.Table {
