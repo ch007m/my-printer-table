@@ -5,7 +5,11 @@ import (
 	"fmt"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/printers"
+	"log"
+	"os"
+	"strings"
 )
 
 var (
@@ -38,6 +42,21 @@ var (
 
 func main() {
 
+	// Path to your JSON file
+	filePath := "services.json"
+
+	// Read JSON file
+	fileData, err := os.ReadFile(filePath)
+	if err != nil {
+		log.Fatalf("Failed to read file: %v", err)
+	}
+
+	// Parse JSON into a Kubernetes List object
+	serviceList := &corev1.ServiceList{}
+	if err := json.Unmarshal(fileData, &serviceList); err != nil {
+		log.Fatalf("Failed to unmarshal JSON: %v", err)
+	}
+
 	// Print a row using a pod
 	opts := printers.PrintOptions{
 		Wide:      true,
@@ -47,9 +66,10 @@ func main() {
 
 	// Print headers and rows using wide
 	opts = printers.PrintOptions{
-		Wide: true,
+		Wide:      true,
+		NoHeaders: false,
 	}
-	printTable(opts)
+	printTable(opts, *serviceList)
 }
 
 func printRow(opts printers.PrintOptions, pod corev1.Pod) {
@@ -64,11 +84,25 @@ func printRow(opts printers.PrintOptions, pod corev1.Pod) {
 	fmt.Println(buf.String())
 }
 
-func printTable(opts printers.PrintOptions) {
+func printTable(opts printers.PrintOptions, serviceList corev1.ServiceList) {
 	// Create the table from the columns and rows.
-	table := &metav1.Table{
-		ColumnDefinitions: columns,
-		Rows:              rows,
+	table := &metav1.Table{}
+	table.ColumnDefinitions = []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string"},
+		{Name: "Namespace", Type: "string"},
+		{Name: "Cluster-IP", Type: "string"},
+		{Name: "Ports", Type: "string"},
+	}
+	for _, svc := range serviceList.Items {
+		row := metav1.TableRow{
+			Cells: []interface{}{
+				svc.Name,
+				svc.Namespace,
+				svc.Spec.ClusterIP,
+				generatePortsList(svc.Spec.Ports),
+			},
+		}
+		table.Rows = append(table.Rows, row)
 	}
 
 	// Print the table
@@ -80,4 +114,12 @@ func printTable(opts printers.PrintOptions) {
 		return
 	}
 	fmt.Println(out.String())
+}
+
+func generatePortsList(ports []corev1.ServicePort) string {
+	var portEntries []string
+	for _, port := range ports {
+		portEntries = append(portEntries, fmt.Sprintf("%d/%s", port.Port, port.Protocol))
+	}
+	return strings.Join(portEntries, ",")
 }
