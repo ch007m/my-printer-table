@@ -12,37 +12,9 @@ import (
 	"strings"
 )
 
-var (
-	podName      = "my-pod-name"
-	podNamespace = "my-namespace"
-	columns      = []metav1.TableColumnDefinition{
-		{Name: "Name", Type: "string"},
-		{Name: "Ready", Type: "string"},
-		{Name: "Status", Type: "string"},
-		{Name: "Retries", Type: "integer", Priority: 1},
-		{Name: "Age", Type: "string", Priority: 1},
-	}
-	rows = []metav1.TableRow{
-		{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
-		{Cells: []interface{}{"test2", "1/2", "podPhase", int64(30), "21h"}},
-		{Cells: []interface{}{"test3", "4/4", "podPhase", int64(1), "22h"}},
-	}
-	pod = &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      podName,
-			Namespace: podNamespace,
-			Labels: map[string]string{
-				"first-label":  "12",
-				"second-label": "label-value",
-			},
-		},
-	}
-)
-
 func main() {
 
-	// Path to your JSON file
+	// Path to the Kubernetes Services JSON file
 	filePath := "services.json"
 
 	// Read JSON file
@@ -57,35 +29,27 @@ func main() {
 		log.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
 
-	// Print a row using a pod
+	// Set print options
 	opts := printers.PrintOptions{
 		Wide:      true,
 		NoHeaders: false,
 	}
-	printRow(opts, *pod)
-
-	// Print headers and rows using wide
-	opts = printers.PrintOptions{
-		Wide:      true,
-		NoHeaders: false,
-	}
-	printTable(opts, *serviceList)
+	printTable(opts, populateKubeServiceTable(*serviceList))
 }
 
-func printRow(opts printers.PrintOptions, pod corev1.Pod) {
-	buf := &bytes.Buffer{}
+func printTable(opts printers.PrintOptions, table metav1.Table) {
+	// Print the table
+	out := bytes.NewBuffer([]byte{})
 	printer := printers.NewTablePrinter(opts)
-	err := printer.PrintObj(&pod, buf)
+	err := printer.PrintObj(&table, out)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
-
-	fmt.Println(buf.String())
+	fmt.Println(out.String())
 }
 
-func printTable(opts printers.PrintOptions, serviceList corev1.ServiceList) {
-	// Create the table from the columns and rows.
+func populateKubeServiceTable(serviceList corev1.ServiceList) metav1.Table {
 	table := &metav1.Table{}
 	table.ColumnDefinitions = []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string"},
@@ -106,16 +70,7 @@ func printTable(opts printers.PrintOptions, serviceList corev1.ServiceList) {
 		}
 		table.Rows = append(table.Rows, row)
 	}
-
-	// Print the table
-	out := bytes.NewBuffer([]byte{})
-	printer := printers.NewTablePrinter(opts)
-	err := printer.PrintObj(table, out)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println(out.String())
+	return *table
 }
 
 func generatePortsList(ports []corev1.ServicePort) string {
