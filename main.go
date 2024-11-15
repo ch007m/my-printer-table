@@ -90,6 +90,7 @@ func printTable(opts printers.PrintOptions, serviceList corev1.ServiceList) {
 	table.ColumnDefinitions = []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string"},
 		{Name: "Namespace", Type: "string"},
+		{Name: "Type", Type: "string"},
 		{Name: "Cluster-IP", Type: "string"},
 		{Name: "Ports", Type: "string"},
 	}
@@ -98,6 +99,7 @@ func printTable(opts printers.PrintOptions, serviceList corev1.ServiceList) {
 			Cells: []interface{}{
 				svc.Name,
 				svc.Namespace,
+				svc.Spec.Type,
 				svc.Spec.ClusterIP,
 				generatePortsList(svc.Spec.Ports),
 			},
